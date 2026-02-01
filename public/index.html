@@ -372,8 +372,9 @@
             filtered.forEach(item => {
                 const isDir = item.type === 'directory';
                 const icon = isDir ? 'fa-folder' : (item.name.endsWith('.pdf') ? 'fa-file-pdf' : 'fa-file');
-                const link = isDir ? '#' : '/data' + state.currentPath + item.name;
-                const onclick = isDir ? `onclick="event.preventDefault(); load('${state.currentPath}${item.name}/')"` : '';
+                const encodedPath = state.currentPath.split('/').map(encodeURIComponent).join('/');
+                const link = isDir ? '#' : '/data' + encodedPath + encodeURIComponent(item.name);
+                const onclick = isDir ? `onclick="event.preventDefault(); load('${state.currentPath}${item.name.replace(/'/g, "\\'")}/')"` : '';
 
                 html += `
                     <a href="${link}" class="card" ${onclick} ${!isDir ? 'target="_blank"' : ''}>
