@@ -284,6 +284,10 @@
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="searchInput" placeholder="Search archive...">
             </div>
+            <button id="installBtn"
+                style="display: none; background: var(--accent); color: white; border: none; padding: 0.75rem 1.25rem; border-radius: 99px; font-weight: 600; cursor: pointer; gap: 0.5rem; align-items: center; justify-content: center; margin-top: 1rem; width: 100%; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);">
+                <i class="fa-solid fa-download"></i> Install App
+            </button>
         </header>
 
         <div class="breadcrumb" id="breadcrumb"></div>
@@ -400,6 +404,40 @@
         };
 
         load();
+
+        // PWA Install Logic
+        let deferredPrompt;
+        const installBtn = document.getElementById('installBtn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent Chrome 67 and earlier from automatically showing the prompt
+            e.preventDefault();
+            // Stash the event so it can be triggered later.
+            deferredPrompt = e;
+            // Update UI to notify the user they can add to home screen
+            installBtn.style.display = 'flex';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                // Show the prompt
+                deferredPrompt.prompt();
+                // Wait for the user to respond to the prompt
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response to the install prompt: ${outcome}`);
+                // We've used the prompt, and can't use it again, throw it away
+                deferredPrompt = null;
+                // Hide the install button
+                installBtn.style.display = 'none';
+            }
+        });
+
+        window.addEventListener('appinstalled', () => {
+            // Log install to analytics
+            console.log('PWA was installed');
+            // Hide the install button
+            installBtn.style.display = 'none';
+        });
     </script>
 </body>
 
