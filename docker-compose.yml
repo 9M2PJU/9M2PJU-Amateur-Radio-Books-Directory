@@ -1,0 +1,7 @@
+services:
+    nginx:
+        image: nginx:alpine
+        ports:
+            - '9082:80'
+        volumes:
+            - /media/Apps/Amatur/books:/usr/share/nginx/html
