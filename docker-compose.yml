@@ -1,6 +1,10 @@
 services:
     nginx:
-        image: nginx:alpine
+        image: p3terx/nginx-fancyindex:latest
+        container_name: nginx-fancy-books
+        environment:
+            - TZ=Asia/Shanghai
+            - DISABLE_HYPERLINK=false
         ports:
             - '9082:80'
         volumes:
