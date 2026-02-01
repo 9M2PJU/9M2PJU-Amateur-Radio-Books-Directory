@@ -1,11 +1,9 @@
 services:
     nginx:
-        image: p3terx/nginx-fancyindex:latest
+        build: .
         container_name: nginx-fancy-books
-        environment:
-            - TZ=Asia/Shanghai
-            - DISABLE_HYPERLINK=false
         ports:
             - '9082:80'
         volumes:
             - /media/Apps/Amatur/books:/usr/share/nginx/html
+            - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
