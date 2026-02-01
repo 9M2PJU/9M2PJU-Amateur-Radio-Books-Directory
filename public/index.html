@@ -306,12 +306,120 @@
         </footer>
     </div>
 
+    <div id="pdfModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle" class="name" style="margin:0; font-size:1.1rem;">Document Viewer</h2>
+                <div class="modal-actions" style="display:flex; gap:1rem; align-items:center;">
+                    <a id="modalDownload" href="#" download class="btn-primary"
+                        style="background:var(--accent); color:white; text-decoration:none; padding:0.5rem 1rem; border-radius:6px; font-size:0.9rem; display:flex; gap:0.5rem; align-items:center;">
+                        <i class="fa-solid fa-download"></i> <span class="hide-mobile">Download</span>
+                    </a>
+                    <button onclick="closeModal()"
+                        style="background:transparent; border:none; color:var(--text); cursor:pointer; font-size:1.25rem; padding:0.5rem;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body" style="flex:1; background:#000; border-radius:inherit; overflow:hidden;">
+                <iframe id="pdfFrame" src="" style="width:100%; height:100%; border:none;"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .modal-content {
+            background: var(--panel);
+            width: 100%;
+            max-width: 1200px;
+            height: 100%;
+            max-height: 90vh;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(22, 27, 38, 0.95);
+        }
+
+        @media (max-width: 640px) {
+            .modal {
+                padding: 0;
+            }
+
+            .modal-content {
+                max-height: 100vh;
+                border-radius: 0;
+            }
+
+            .hide-mobile {
+                display: none;
+            }
+        }
+    </style>
+
     <script>
         const state = {
             currentPath: '/',
             items: [],
-            filter: ''
+            filter: '',
+            stats: {}
         };
+
+        // Fetch stats from service
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/stats/stats');
+                if (res.ok) {
+                    state.stats = await res.json();
+                    render(); // Re-render to show stats
+                }
+            } catch (err) {
+                console.warn('Failed to fetch stats:', err);
+            }
+        }
+
+        // Track an action
+        async function trackAction(filename, type) {
+            // Optimistic update
+            if (!state.stats[filename]) state.stats[filename] = { views: 0, downloads: 0 };
+            if (type === 'view') state.stats[filename].views++;
+            if (type === 'download') state.stats[filename].downloads++;
+            render(); // Update UI immediately
+
+            try {
+                await fetch('/api/stats/track', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file: filename, type })
+                });
+            } catch (err) {
+                console.error('Tracking failed:', err);
+            }
+        }
 
         async function load(path = '/') {
             state.currentPath = path;
@@ -374,7 +482,26 @@
                 const icon = isDir ? 'fa-folder' : (item.name.endsWith('.pdf') ? 'fa-file-pdf' : 'fa-file');
                 const encodedPath = state.currentPath.split('/').map(encodeURIComponent).join('/');
                 const link = isDir ? '#' : '/data' + encodedPath + encodeURIComponent(item.name);
-                const onclick = isDir ? `onclick="event.preventDefault(); load('${state.currentPath}${item.name.replace(/'/g, "\\'")}/')"` : '';
+
+                // Stats
+                const fullPath = (state.currentPath + item.name).replace(/^\//, ''); // Remove leading slash for consistency
+                const fileStats = state.stats[fullPath] || { views: 0, downloads: 0 };
+                const statsHtml = !isDir ? `
+                    <div class="stats" style="margin-top:0.25rem; font-size:0.75rem; color:var(--text-dim); display:flex; gap:0.75rem;">
+                        <span title="Views"><i class="fa-regular fa-eye"></i> ${fileStats.views}</span>
+                        <span title="Downloads"><i class="fa-solid fa-download"></i> ${fileStats.downloads}</span>
+                    </div>
+                ` : '';
+
+                // Onclick handler
+                let onclick;
+                if (isDir) {
+                    onclick = `onclick="event.preventDefault(); load('${state.currentPath}${item.name.replace(/'/g, "\\'")}/')"`;
+                } else if (item.name.endsWith('.pdf')) {
+                    onclick = `onclick="event.preventDefault(); openReader('${item.name.replace(/'/g, "\\'")}', '${link}', '${fullPath.replace(/'/g, "\\'")}')"`;
+                } else {
+                    onclick = ''; // Default link behavior
+                }
 
                 html += `
                     <a href="${link}" class="card" ${onclick} ${!isDir ? 'target="_blank"' : ''}>
@@ -384,6 +511,7 @@
                         <div class="info">
                             <div class="name">${item.name}</div>
                             <div class="meta">${isDir ? 'Folder' : formatSize(item.size)}</div>
+                            ${statsHtml}
                         </div>
                     </a>
                 `;
@@ -399,12 +527,51 @@
             return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
         }
 
+        // PDF Reader functions
+        function openReader(name, url, fullPath) {
+            const modal = document.getElementById('pdfModal');
+            const frame = document.getElementById('pdfFrame');
+            const title = document.getElementById('modalTitle');
+            const downloadBtn = document.getElementById('modalDownload');
+
+            title.textContent = name;
+            frame.src = url;
+
+            // Setup download button
+            downloadBtn.href = url;
+            downloadBtn.onclick = (e) => {
+                // Track download when clicked from modal
+                trackAction(fullPath, 'download');
+            };
+
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+
+            // Track view
+            trackAction(fullPath, 'view');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('pdfModal');
+            const frame = document.getElementById('pdfFrame');
+
+            modal.style.display = 'none';
+            frame.src = 'about:blank'; // Clear iframe to stop memory leaks/audio
+            document.body.style.overflow = '';
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
         document.getElementById('searchInput').oninput = (e) => {
             state.filter = e.target.value;
             render();
         };
 
         load();
+        fetchStats(); // Initial stats fetch
 
         // PWA Install Logic
         let deferredPrompt;

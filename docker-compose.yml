@@ -9,3 +9,10 @@ services:
             - ./public:/usr/share/nginx/html:ro
             - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
             - /media/Apps/Amatur/books:/books:ro
+
+    stats:
+        build: ./stats-service
+        container_name: books-stats
+        restart: unless-stopped
+        volumes:
+            - ./stats-data:/app/data
