@@ -52,26 +52,6 @@ pie title Project Composition
 
 ---
 
-## 📦 Deployment
-
-Deploying the library is a single-command process:
-
-```bash
-# Clone the repository
-git clone https://github.com/your-repo/9M2PJU-Amateur-Radio-Books-Directory.git
-
-# Start the service
-docker compose up -d
-```
-
-### Cleanup Old Files
-To ensure a clean modern interface, remove old index files:
-```bash
-find /media/Apps/Amatur/books/ -type f \( -name "index.html" -o -name "generate*.sh" \) -delete
-```
-
----
-
 ## 👨‍💻 Developed By
 **Served to you by 9M2PJU**
 Visit us at [hamradio.my](https://hamradio.my)
