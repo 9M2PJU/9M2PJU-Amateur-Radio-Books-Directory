@@ -27,6 +27,12 @@ async function loadStats() {
         }
     } catch (err) {
         console.error('Error loading stats:', err);
+        // If file is corrupted, start fresh
+        if (err.name === 'SyntaxError') {
+            console.log('Stats file corrupted, resetting stats.');
+            stats = {};
+            isDirty = true; // Force save to overwrite corrupted file
+        }
     }
 }
 
@@ -81,7 +87,18 @@ app.post('/track', (req, res) => {
     res.json(stats[file]);
 });
 
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
 app.listen(PORT, async () => {
     await loadStats();
     console.log(`Stats service running on port ${PORT}`);
 });
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error('Unhandled Error:', err);
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+});
+
